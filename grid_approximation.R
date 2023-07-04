@@ -121,13 +121,13 @@ grid_approximation <- function(
   ct_data <- case_when(
     central_tendency == "median" ~ 
       case_when(
-        likelihood_type == "dnorm" ~ prior[1],
-        likelihood_type == "data"  ~ median(prior)
+        likelihood_type == "dnorm" ~ likelihood[1],
+        likelihood_type == "data"  ~ median(likelihood)
       ),
     central_tendency == "mean" ~       
       case_when(
-        likelihood_type == "dnorm" ~ prior[1],
-        likelihood_type == "data"  ~ mean(prior)
+        likelihood_type == "dnorm" ~ likelihood[1],
+        likelihood_type == "data"  ~ mean(likelihood)
       )
   )
   ct_posterior <- case_when(
