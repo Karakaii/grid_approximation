@@ -167,7 +167,7 @@ grid_approximation <- function(
       legend.text          = element_text(size = 10),
       legend.text.align    = 0,
       legend.title         = element_text(size=11, face = "bold"),
-      legend.key           = element_rect(size = 0.4),
+      legend.key           = element_rect(linewidth = 0.4),
       legend.background    = element_blank(),
       legend.box.just      = "left",
       legend.box.background= element_rect(colour = "black")
