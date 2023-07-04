@@ -27,7 +27,7 @@
 # The plot_x_lab allows users to set the x lab of the plot.
 
 grid_approximation <- function(
-    # Grid information
+  # Grid information
   grid_length = 10000,
   grid_min,
   grid_max,
@@ -112,7 +112,7 @@ grid_approximation <- function(
         prior_type == "dnorm" ~ prior[1],
         prior_type == "data"  ~ median(prior)
       ),
-    central_mean == "mean" ~       
+    central_tendency == "mean" ~       
       case_when(
         prior_type == "dnorm" ~ prior[1],
         prior_type == "data"  ~ mean(prior)
@@ -124,7 +124,7 @@ grid_approximation <- function(
         likelihood_type == "dnorm" ~ prior[1],
         likelihood_type == "data"  ~ median(prior)
       ),
-    central_mean == "mean" ~       
+    central_tendency == "mean" ~       
       case_when(
         likelihood_type == "dnorm" ~ prior[1],
         likelihood_type == "data"  ~ mean(prior)
@@ -132,7 +132,7 @@ grid_approximation <- function(
   )
   ct_posterior <- case_when(
     central_tendency == "median" ~ median(posterior_sample$posterior),
-    central_mean == "mean" ~ mean(posterior_sample$posterior)
+    central_tendency == "mean" ~ mean(posterior_sample$posterior)
   )
   
   ## Make the graph
