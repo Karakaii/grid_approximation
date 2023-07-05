@@ -48,20 +48,6 @@ grid_approximation <- function(
   # need grid_n for the dnorm generation
   grid_data <- data.frame(
     grid_n = seq(from = grid_min, to = grid_max, length = grid_length)
-  ) %>% mutate(
-    prior = 
-      dnorm(
-        x    = grid_n,
-        mean = prior[1],
-        sd   = prior[2]
-      )
-    , 
-    likelihood = 
-      dnorm(
-        x    = grid_n,
-        mean = likelihood[1],
-        sd   = likelihood[2]
-      )
   ) 
   
   # Can't use ifelse or case_when, both have issues
@@ -69,8 +55,17 @@ grid_approximation <- function(
   # case_when calculates everything and then does the conditional, which means 
   # it breaks unnecessarily
   
-  # Need to use the grid to do the dnorm, so I will start with that. And
-  # then I can insert the other versions if need be.
+  # For the prior
+  if(prior_type == "dnorm") {
+    grid_data <- grid_data %>% mutate(
+      prior = 
+      dnorm(
+        x    = grid_n,
+        mean = prior[1],
+        sd   = prior[2]
+      )
+    )
+  }
   if(prior_type == "data") {
     grid_data$prior <- density(
       prior,
@@ -79,6 +74,17 @@ grid_approximation <- function(
     )$y
   }
   
+  # For the likelihood
+  if(likelihood_type == "dnorm") {
+    grid_data <- grid_data %>% mutate(
+      likelihood = 
+        dnorm(
+          x    = grid_n,
+          mean = likelihood[1],
+          sd   = likelihood[2]
+        )
+    )
+  }
   if(likelihood_type == "data") {
     grid_data$likelihood <- density(
       likelihood,
