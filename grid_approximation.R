@@ -43,36 +43,52 @@ grid_approximation <- function(
   bayes_colors = c("prior"="#ff5757", "data"="#4acdf1", "posterior"="#d269ff")
 ) {
   
-  # Building the grid
+  ## Building the grid
   # grid_n is the number of splits
+  # need grid_n for the dnorm generation
   grid_data <- data.frame(
     grid_n = seq(from = grid_min, to = grid_max, length = grid_length)
   ) %>% mutate(
-    prior = case_when(
-      prior_type == "dnorm" ~ dnorm(
+    prior = 
+      dnorm(
         x    = grid_n,
         mean = prior[1],
         sd   = prior[2]
-      ),
-      prior_type == "data" ~ density(
-        prior,
-        from = grid_min, to = grid_max,
-        n = grid_length
-      )$y
-    ), 
-    likelihood = case_when(
-      likelihood_type == "dnorm" ~ dnorm(
+      )
+    , 
+    likelihood = 
+      dnorm(
         x    = grid_n,
         mean = likelihood[1],
         sd   = likelihood[2]
-      ),
-      likelihood_type == "data" ~ density(
-        likelihood,
-        from = grid_min, to = grid_max,
-        n = grid_length
-      )$y
-    )
-  ) %>% mutate(
+      )
+  ) 
+  
+  # Can't use ifelse or case_when, both have issues
+  # ifelse provides only one number
+  # case_when calculates everything and then does the conditional, which means 
+  # it breaks unnecessarily
+  
+  # Need to use the grid to do the dnorm, so I will start with that. And
+  # then I can insert the other versions if need be.
+  if(prior_type == "data") {
+    grid_data$prior <- density(
+      prior,
+      from = grid_min, to = grid_max,
+      n = grid_length
+    )$y
+  }
+  
+  if(likelihood_type == "data") {
+    grid_data$likelihood <- density(
+      likelihood,
+      from = grid_min, to = grid_max,
+      n = grid_length
+    )$y
+  }
+  
+  # Then use bayes rule to calculate the posterior
+  grid_data <-  grid_data %>% mutate(
     unnormalised = likelihood * prior,
     posterior = unnormalised / sum(unnormalised)
   )
