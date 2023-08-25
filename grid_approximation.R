@@ -1,33 +1,6 @@
-# I'm trying to make a flexible grid approximation function in order to 
-# streamline the process of running grid approximation.
-
-# The function takes in information about the grid you create.
-# The grid_length represents how many parts the grid is made of.
-# The more parts, the higher the resolution.
-# This also represents the number of samples taken.
-# grid_min and grid_max denote the start and end of the grid.
-
-# The likelihood and the prior are entered in similar ways. An element with
-# '_type' indicated how the function is to use the information entered.
-# * if '_type' is "dnorm", then the prior or likelihood will need to provide an
-#   array with two element, a mean and an SD.
-# * if '_type' is "data", then the prior or likelihood will need to provide an
-#   array with all the data, for which the density will be extracted using
-#   density().
-
-# central_tendency determines whether the mean or median is presented in
-# the graph.
-
-# plot_x_lim represent the limits (lower, upper) for the cartesian coordinates of the
-# graph.
-
-# The bayes_colors sets a default for the colours that users can change.
-# Must have the names "prior", "data", and "posterior"
-
-# The plot_x_lab allows users to set the x lab of the plot.
 
 grid_approximation <- function(
-  # Grid information
+    # Grid information
   grid_length = 10000,
   grid_min,
   grid_max,
@@ -59,11 +32,21 @@ grid_approximation <- function(
   if(prior_type == "dnorm") {
     grid_data <- grid_data %>% mutate(
       prior = 
-      dnorm(
-        x    = grid_n,
-        mean = prior[1],
-        sd   = prior[2]
-      )
+        dnorm(
+          x    = grid_n,
+          mean = prior[1],
+          sd   = prior[2]
+        )
+    )
+  }
+  if(prior_type == "dbeta") {
+    grid_data <- grid_data %>% mutate(
+      prior = 
+        dbeta(
+          x    = grid_n,
+          shape1 = prior[1],
+          shape2 = prior[2]
+        )
     )
   }
   if(prior_type == "data") {
@@ -82,6 +65,16 @@ grid_approximation <- function(
           x    = grid_n,
           mean = likelihood[1],
           sd   = likelihood[2]
+        )
+    )
+  }
+  if(likelihood_type == "dbeta") {
+    grid_data <- grid_data %>% mutate(
+      likelihood = 
+        dbeta(
+          x    = grid_n,
+          shape1 = likelihood[1],
+          shape2 = likelihood[2]
         )
     )
   }
@@ -132,11 +125,13 @@ grid_approximation <- function(
     central_tendency == "median" ~ 
       case_when(
         prior_type == "dnorm" ~ prior[1],
+        prior_type == "dbeta" ~ prior[1]/(prior[1]+prior[2]),
         prior_type == "data"  ~ median(prior)
       ),
     central_tendency == "mean" ~       
       case_when(
         prior_type == "dnorm" ~ prior[1],
+        prior_type == "dbeta" ~ qbeta(0.5, prior[1], prior[2]),
         prior_type == "data"  ~ mean(prior)
       )
   )
@@ -144,11 +139,13 @@ grid_approximation <- function(
     central_tendency == "median" ~ 
       case_when(
         likelihood_type == "dnorm" ~ likelihood[1],
+        likelihood_type == "dbeta" ~ likelihood[1]/(likelihood[1]+likelihood[2]),
         likelihood_type == "data"  ~ median(likelihood)
       ),
     central_tendency == "mean" ~       
       case_when(
         likelihood_type == "dnorm" ~ likelihood[1],
+        likelihood_type == "dbeta" ~ qbeta(0.5, likelihood[1], likelihood[2]),
         likelihood_type == "data"  ~ mean(likelihood)
       )
   )
