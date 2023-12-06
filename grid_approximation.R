@@ -1,7 +1,17 @@
+# Temporary place to update my grid approximation function
 
+#~############################################################################~#
+# Grid Approximation function ----
+#~############################################################################~#
+# This is a swiss-knife function to do grid approximation with all sorts of
+# distributions (adding them as I need them).
+
+#~=======================================================~=
+## Function parameters ----
+#~=======================================================~=
 grid_approximation <- function(
     # Grid information
-  grid_length = 10000,
+  grid_length = 100000,
   grid_min,
   grid_max,
   # Prior and likelihood information
@@ -11,11 +21,27 @@ grid_approximation <- function(
   likelihood_type,
   # Graph information
   central_tendency = "median",
-  plot_x_lim,
+  plot_x_lim = NULL,
   plot_x_lab = "unit",
-  bayes_colors = c("prior"="#ff5757", "data"="#4acdf1", "posterior"="#d269ff")
+  bayes_colors = c(
+    "prior"="#ff5757", 
+    "new data (likelihood)"="#4acdf1", 
+    "posterior"="#6a0dad"
+  ),
+  custom_labels = NULL,
+  seed = NULL
 ) {
   
+  # Run a potential seed
+  if(!is.null(seed)){set.seed(seed)}
+  
+  #~=======================================================~=
+  ## Building the grid ----
+  #~=======================================================~=
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ### Grid ----
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ## Building the grid
   # grid_n is the number of splits
   # need grid_n for the dnorm generation
@@ -23,11 +49,17 @@ grid_approximation <- function(
     grid_n = seq(from = grid_min, to = grid_max, length = grid_length)
   ) 
   
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ### Disclaimer ----
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # Can't use ifelse or case_when, both have issues
   # ifelse provides only one number
   # case_when calculates everything and then does the conditional, which means 
   # it breaks unnecessarily
   
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ### Prior ----
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # For the prior
   if(prior_type == "dnorm") {
     grid_data <- grid_data %>% mutate(
@@ -57,6 +89,9 @@ grid_approximation <- function(
     )$y
   }
   
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ### Likelihood ----
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # For the likelihood
   if(likelihood_type == "dnorm") {
     grid_data <- grid_data %>% mutate(
@@ -86,8 +121,11 @@ grid_approximation <- function(
     )$y
   }
   
+  #~=======================================================~=
+  ## Calculating the posterior ----
+  #~=======================================================~=
   # Then use bayes rule to calculate the posterior
-  grid_data <-  grid_data %>% mutate(
+  grid_data <- grid_data %>% mutate(
     unnormalised = likelihood * prior,
     posterior = unnormalised / sum(unnormalised)
   )
@@ -103,80 +141,128 @@ grid_approximation <- function(
     select(grid_n) %>% 
     rename(posterior = grid_n)
   
+  #~=======================================================~=
+  ## Making the graph ----
+  #~=======================================================~=
+  
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ### Getting the data ----
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  
   # We prepare the data for the plot by extracting the data
   # for the prior, data, and posterior
-  plot_data <- rbind(
-    grid_data %>% 
-      select(grid_n, prior) %>% 
-      rename(density = prior) %>%
-      mutate(type = "prior", transparence=0.3),
-    grid_data %>% 
-      select(grid_n, likelihood) %>% 
-      rename(density = likelihood) %>%
-      mutate(type = "data", transparence=0.4),
-    grid_data %>% 
-      select(grid_n, unnormalised) %>% 
-      rename(density = unnormalised) %>%
-      mutate(type = "posterior", transparence=0.5)
-  )
+  plot_data <- grid_data %>% 
+    # Need to normalise the prior and likelihood for it all to look proportional
+    mutate(
+      prior = prior / sum(prior),
+      likelihood = likelihood / sum(likelihood)
+    ) %>% select(-unnormalised) %>% 
+    # Pivot for the graph
+    pivot_longer(
+      cols = -grid_n,
+      names_to = "distribution",
+      values_to = "value"
+    ) %>% 
+    # Make likelihood easier to understand
+    mutate(distribution = ifelse(
+      distribution == "likelihood", 
+      "new data (likelihood)", 
+      distribution)
+    )
   
-  # Determine the central tendencies
-  ct_prior <- case_when(
-    central_tendency == "median" ~ 
-      case_when(
-        prior_type == "dnorm" ~ prior[1],
-        prior_type == "dbeta" ~ prior[1]/(prior[1]+prior[2]),
-        prior_type == "data"  ~ median(prior)
-      ),
-    central_tendency == "mean" ~       
-      case_when(
-        prior_type == "dnorm" ~ prior[1],
-        prior_type == "dbeta" ~ qbeta(0.5, prior[1], prior[2]),
-        prior_type == "data"  ~ mean(prior)
-      )
-  )
-  ct_data <- case_when(
-    central_tendency == "median" ~ 
-      case_when(
-        likelihood_type == "dnorm" ~ likelihood[1],
-        likelihood_type == "dbeta" ~ likelihood[1]/(likelihood[1]+likelihood[2]),
-        likelihood_type == "data"  ~ median(likelihood)
-      ),
-    central_tendency == "mean" ~       
-      case_when(
-        likelihood_type == "dnorm" ~ likelihood[1],
-        likelihood_type == "dbeta" ~ qbeta(0.5, likelihood[1], likelihood[2]),
-        likelihood_type == "data"  ~ mean(likelihood)
-      )
-  )
-  ct_posterior <- case_when(
-    central_tendency == "median" ~ median(posterior_sample$posterior),
-    central_tendency == "mean" ~ mean(posterior_sample$posterior)
-  )
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ### Preparing the central tendencies ----
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   
-  ## Make the graph
-  bayes_graph <- ggplot(plot_data, aes(x = grid_n, y = density, color = type)) +
+  # If there's only one central tendency specified, multiply it
+  if(length(central_tendency) == 1) {
+    central_tendency <- rep(central_tendency, 3)
+  }
+  
+  #### Prior ----
+  if(is.numeric(central_tendency[[1]])) {
+    ct_prior <- central_tendency[[1]]
+  } else {
+    ct_prior <- case_when(
+      central_tendency[[1]] == "median" ~ 
+        case_when(
+          prior_type == "dnorm" ~ prior[1],
+          prior_type == "dbeta" ~ prior[1]/(prior[1]+prior[2]),
+          prior_type == "data"  ~ median(prior)
+        ),
+      central_tendency[[1]] == "mean" ~       
+        case_when(
+          prior_type == "dnorm" ~ prior[1],
+          prior_type == "dbeta" ~ qbeta(0.5, prior[1], prior[2]),
+          prior_type == "data"  ~ mean(prior)
+        )
+    )
+  }
+  
+  #### Likelihood ----
+  if(is.numeric(central_tendency[[2]])) {
+    ct_data <- central_tendency[[2]]
+  } else {
+    ct_data <- case_when(
+      central_tendency[[2]] == "median" ~ 
+        case_when(
+          likelihood_type == "dnorm" ~ likelihood[1],
+          likelihood_type == "dbeta" ~ likelihood[1]/
+            (likelihood[1]+likelihood[2]),
+          likelihood_type == "data"  ~ median(likelihood)
+        ),
+      central_tendency[[2]] == "mean" ~       
+        case_when(
+          likelihood_type == "dnorm" ~ likelihood[1],
+          likelihood_type == "dbeta" ~ qbeta(0.5, likelihood[1], likelihood[2]),
+          likelihood_type == "data"  ~ mean(likelihood)
+        )
+    )
+  }
+  
+  #### Posterior ----
+  if(is.numeric(central_tendency[[3]])) {
+    ct_posterior <- central_tendency[[3]]
+  } else {
+    ct_posterior <- case_when(
+      central_tendency[[3]] == "median" ~ median(posterior_sample$posterior),
+      central_tendency[[3]] == "mean" ~ mean(posterior_sample$posterior)
+    )
+  }
+
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  ### The graph ----
+  #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  
+  # Determine if there are custom labels for the distribution
+  distribution_labels <- names(bayes_colors)
+  if(!is.null(custom_labels)) {distribution_labels <- custom_labels}
+  
+  bayes_graph <- 
+    ggplot(plot_data, aes(x = grid_n, y = value, color = distribution)) +
     
     # graph the distributions
     geom_line() +
     
     # Graph central tendencies
-    geom_point(
-      y=0, x=ct_prior, size = 3,
-      fill = NA, color = bayes_colors["prior"], shape = 21
+    geom_vline(
+      xintercept=ct_prior, 
+      color = bayes_colors["prior"], 
+      linetype = 2
     ) +
-    geom_point(
-      y=0, x=ct_data, size = 3,
-      fill = NA, color = bayes_colors["data"], shape = 21
+    geom_vline(
+      xintercept=ct_data, 
+      color = bayes_colors["new data (likelihood)"], 
+      linetype = 2
     ) +
-    geom_point(
-      y=0, x=ct_posterior, size = 3,
-      fill = NA, color = bayes_colors["posterior"], shape = 21
+    geom_vline(
+      xintercept=ct_posterior, 
+      color = bayes_colors["posterior"], 
+      linetype = 2
     ) +
     
     # General presentation
-    xlab(plot_x_lab) + ylab("density") +
-    coord_cartesian(xlim = plot_x_lim) +
+    xlab(plot_x_lab) + 
+    ylab("density") +
     cowplot::theme_cowplot()  +
     theme(
       # Below specifies details of legends appearance
@@ -189,9 +275,45 @@ grid_approximation <- function(
       legend.key           = element_rect(linewidth = 0.4),
       legend.background    = element_blank(),
       legend.box.just      = "left",
-      legend.box.background= element_rect(colour = "black")
-    ) + scale_color_manual(name  = "Distributions", values = bayes_colors)
+      legend.box.background= element_rect(colour = "black"),
+      # Modify the y axis
+      axis.line.y  = element_blank(),
+      axis.ticks.y = element_blank(),
+      axis.text.y  = element_blank()
+    ) + 
+    scale_color_manual(
+      name  = "Distributions", 
+      values = bayes_colors,
+      breaks = names(bayes_colors),
+      labels = distribution_labels
+      )
   
+  if(!is.null(plot_x_lim)) {
+    bayes_graph <- bayes_graph + coord_cartesian(xlim = plot_x_lim)
+  }
+  
+  #~=======================================================~=
+  ## Returning items ----
+  #~=======================================================~=
   ## Return the graph and th posterior in a list
-  return(list(posterior_sample$posterior, bayes_graph))
+  return(list("posterior" = posterior_sample$posterior, "graph" = bayes_graph))
+}
+
+#~############################################################################~#
+# Normal-normal ----
+#~############################################################################~#
+
+combine_normals <- function(mu1, sigma1, mu2, sigma2) {
+  sigma1_sq <- sigma1^2
+  sigma2_sq <- sigma2^2
+  # All these different versions work
+  mu_post <- (1/((1/sigma1_sq) + (1/sigma2_sq))) * ((mu1/sigma1_sq)+(mu2/sigma2_sq))
+  mu_post <- mu2 * (sigma1_sq/(sigma1_sq+sigma2_sq)) + mu1 * (sigma2_sq/(sigma1_sq+sigma2_sq))
+  mu_post <- (sigma1_sq * mu2 + sigma2_sq * mu1) / (sigma1_sq + sigma2_sq)
+  sigma_post <- sqrt(1 / (1 / sigma1_sq + 1 / sigma2_sq))
+  
+  ci_lb <- mu_post - sigma_post*1.96
+  ci_ub <- mu_post + sigma_post*1.96
+  
+  return(data.frame(mu_post, sigma_post, ci_lb, ci_ub))
 }
