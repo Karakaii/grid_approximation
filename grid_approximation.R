@@ -1,5 +1,3 @@
-# Temporary place to update my grid approximation function
-
 #~############################################################################~#
 # Grid Approximation function ----
 #~############################################################################~#
@@ -142,6 +140,25 @@ grid_approximation <- function(
     rename(posterior = grid_n)
   
   #~=======================================================~=
+  ## Calculating weights ----
+  #~=======================================================~=
+  
+  # Calculate weights at each grid point
+  # grid_data <- grid_data %>% mutate(
+  #   prior_weight = prior / (prior + likelihood),
+  #   likelihood_weight = likelihood / (prior + likelihood)
+  # )
+  # Need to avoid 0 denominators, set to equal weight otherwise.
+  grid_data <- grid_data %>% mutate(
+    prior_weight = ifelse(prior + likelihood == 0, 0.5, prior / (prior + likelihood)),
+    likelihood_weight = ifelse(prior + likelihood == 0, 0.5, likelihood / (prior + likelihood))
+  )
+  
+  # Aggregate total weights by summing over all grid points
+  total_prior_weight <- sum(grid_data$prior_weight * grid_data$posterior)
+  total_likelihood_weight <- sum(grid_data$likelihood_weight * grid_data$posterior)
+  
+  #~=======================================================~=
   ## Making the graph ----
   #~=======================================================~=
   
@@ -228,7 +245,7 @@ grid_approximation <- function(
       central_tendency[[3]] == "mean" ~ mean(posterior_sample$posterior)
     )
   }
-
+  
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ### The graph ----
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -286,7 +303,7 @@ grid_approximation <- function(
       values = bayes_colors,
       breaks = names(bayes_colors),
       labels = distribution_labels
-      )
+    )
   
   if(!is.null(plot_x_lim)) {
     bayes_graph <- bayes_graph + coord_cartesian(xlim = plot_x_lim)
@@ -296,12 +313,21 @@ grid_approximation <- function(
   ## Returning items ----
   #~=======================================================~=
   ## Return the graph and th posterior in a list
-  return(list("posterior" = posterior_sample$posterior, "graph" = bayes_graph))
+  return(list(
+    "posterior" = posterior_sample$posterior, 
+    "graph" = bayes_graph,
+    "weights" = list(
+      "prior" = total_prior_weight,
+      "likelihood" = total_likelihood_weight
+    )
+  ))
 }
 
 #~############################################################################~#
 # Normal-normal ----
 #~############################################################################~#
+# The normal-normal conjugate. Useful to use to check that the grid approximation
+# is working with simple models.
 
 combine_normals <- function(mu1, sigma1, mu2, sigma2) {
   sigma1_sq <- sigma1^2
