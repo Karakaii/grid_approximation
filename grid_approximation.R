@@ -319,7 +319,8 @@ grid_approximation <- function(
     "weights" = list(
       "prior" = total_prior_weight,
       "likelihood" = total_likelihood_weight
-    )
+    ),
+    "grid_data" = grid_data
   ))
 }
 
