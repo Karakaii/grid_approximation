@@ -167,7 +167,7 @@ grid_approximation <- function(
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  
   # We prepare the data for the plot by extracting the data
   # for the prior, data, and posterior
-  plot_data <- grid_data %>% 
+  plot_data <- grid_data %>% select(-c(contains("weight"))) %>% 
     # Need to normalise the prior and likelihood for it all to look proportional
     mutate(
       prior = prior / sum(prior),
