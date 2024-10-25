@@ -20,7 +20,7 @@ grid_approximation <- function(
   likelihood,
   likelihood_type,
   # Graph information
-  central_tendency = "median",
+  central_tendency = NULL,
   plot_x_lim = NULL,
   plot_x_lab = "unit",
   bayes_colors = c(
@@ -172,61 +172,65 @@ grid_approximation <- function(
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   ### Preparing the central tendencies ----
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  # Skip if central_tendency is NULL
+  if(!is.null(central_tendency)) {
   
-  # If there's only one central tendency specified, multiply it
-  if(length(central_tendency) == 1) {
-    central_tendency <- rep(central_tendency, 3)
-  }
-  
-  #### Prior ----
-  if(is.numeric(central_tendency[[1]])) {
-    ct_prior <- central_tendency[[1]]
-  } else {
-    ct_prior <- case_when(
-      central_tendency[[1]] == "median" ~ 
-        case_when(
-          prior_type == "dnorm" ~ prior[1],
-          prior_type == "dbeta" ~ prior[1]/(prior[1]+prior[2]),
-          prior_type == "data"  ~ median(prior)
-        ),
-      central_tendency[[1]] == "mean" ~       
-        case_when(
-          prior_type == "dnorm" ~ prior[1],
-          prior_type == "dbeta" ~ qbeta(0.5, prior[1], prior[2]),
-          prior_type == "data"  ~ mean(prior)
-        )
-    )
-  }
-  
-  #### Likelihood ----
-  if(is.numeric(central_tendency[[2]])) {
-    ct_data <- central_tendency[[2]]
-  } else {
-    ct_data <- case_when(
-      central_tendency[[2]] == "median" ~ 
-        case_when(
-          likelihood_type == "dnorm" ~ likelihood[1],
-          likelihood_type == "dbeta" ~ likelihood[1]/
-            (likelihood[1]+likelihood[2]),
-          likelihood_type == "data"  ~ median(likelihood)
-        ),
-      central_tendency[[2]] == "mean" ~       
-        case_when(
-          likelihood_type == "dnorm" ~ likelihood[1],
-          likelihood_type == "dbeta" ~ qbeta(0.5, likelihood[1], likelihood[2]),
-          likelihood_type == "data"  ~ mean(likelihood)
-        )
-    )
-  }
-  
-  #### Posterior ----
-  if(is.numeric(central_tendency[[3]])) {
-    ct_posterior <- central_tendency[[3]]
-  } else {
-    ct_posterior <- case_when(
-      central_tendency[[3]] == "median" ~ median(posterior_sample$posterior),
-      central_tendency[[3]] == "mean" ~ mean(posterior_sample$posterior)
-    )
+    # If there's only one central tendency specified, multiply it
+    if(length(central_tendency) == 1) {
+      central_tendency <- rep(central_tendency, 3)
+    }
+    
+    #### Prior ----
+    if(is.numeric(central_tendency[[1]])) {
+      ct_prior <- central_tendency[[1]]
+    } else {
+      ct_prior <- case_when(
+        central_tendency[[1]] == "median" ~ 
+          case_when(
+            prior_type == "dnorm" ~ prior[1],
+            prior_type == "dbeta" ~ prior[1]/(prior[1]+prior[2]),
+            prior_type == "data"  ~ median(prior)
+          ),
+        central_tendency[[1]] == "mean" ~       
+          case_when(
+            prior_type == "dnorm" ~ prior[1],
+            prior_type == "dbeta" ~ qbeta(0.5, prior[1], prior[2]),
+            prior_type == "data"  ~ mean(prior)
+          )
+      )
+    }
+    
+    #### Likelihood ----
+    if(is.numeric(central_tendency[[2]])) {
+      ct_data <- central_tendency[[2]]
+    } else {
+      ct_data <- case_when(
+        central_tendency[[2]] == "median" ~ 
+          case_when(
+            likelihood_type == "dnorm" ~ likelihood[1],
+            likelihood_type == "dbeta" ~ likelihood[1]/
+              (likelihood[1]+likelihood[2]),
+            likelihood_type == "data"  ~ median(likelihood)
+          ),
+        central_tendency[[2]] == "mean" ~       
+          case_when(
+            likelihood_type == "dnorm" ~ likelihood[1],
+            likelihood_type == "dbeta" ~ qbeta(0.5, likelihood[1], likelihood[2]),
+            likelihood_type == "data"  ~ mean(likelihood)
+          )
+      )
+    }
+    
+    #### Posterior ----
+    if(is.numeric(central_tendency[[3]])) {
+      ct_posterior <- central_tendency[[3]]
+    } else {
+      ct_posterior <- case_when(
+        central_tendency[[3]] == "median" ~ median(posterior_sample$posterior),
+        central_tendency[[3]] == "mean" ~ mean(posterior_sample$posterior)
+      )
+    }
   }
 
   #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -242,23 +246,6 @@ grid_approximation <- function(
     
     # graph the distributions
     geom_line() +
-    
-    # Graph central tendencies
-    geom_vline(
-      xintercept=ct_prior, 
-      color = bayes_colors["prior"], 
-      linetype = 2
-    ) +
-    geom_vline(
-      xintercept=ct_data, 
-      color = bayes_colors["new data (likelihood)"], 
-      linetype = 2
-    ) +
-    geom_vline(
-      xintercept=ct_posterior, 
-      color = bayes_colors["posterior"], 
-      linetype = 2
-    ) +
     
     # General presentation
     xlab(plot_x_lab) + 
@@ -290,6 +277,25 @@ grid_approximation <- function(
   
   if(!is.null(plot_x_lim)) {
     bayes_graph <- bayes_graph + coord_cartesian(xlim = plot_x_lim)
+  }
+
+  if(!is.null(central_tendency)) {
+    bayes_graph <- bayes_graph +
+      geom_vline(
+        xintercept = ct_prior,
+        linetype = "dashed",
+        color = bayes_colors["prior"]
+      ) +
+      geom_vline(
+        xintercept = ct_data,
+        linetype = "dashed",
+        color = bayes_colors["new data (likelihood)"]
+      ) +
+      geom_vline(
+        xintercept = ct_posterior,
+        linetype = "dashed",
+        color = bayes_colors["posterior"]
+      )
   }
   
   #~=======================================================~=
